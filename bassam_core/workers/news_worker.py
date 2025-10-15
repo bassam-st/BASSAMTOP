@@ -1,5 +1,5 @@
 import os, time, json, threading
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
