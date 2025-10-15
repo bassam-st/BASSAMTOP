@@ -1,1 +1,12 @@
+fastapi
+uvicorn
+httpx
+requests
+beautifulsoup4
+pydantic
+aiofiles
+python-multipart
 pillow==11.3.0
+jinja2
+feedparser
+lxml
