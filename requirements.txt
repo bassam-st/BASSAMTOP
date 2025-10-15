@@ -10,3 +10,4 @@ pillow==11.3.0
 jinja2
 feedparser
 lxml
+duckduckgo-search
