@@ -1,6 +1,6 @@
 import os, json, time
 from typing import List, Dict
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
