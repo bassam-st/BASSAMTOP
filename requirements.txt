@@ -11,3 +11,4 @@ jinja2
 feedparser
 lxml
 duckduckgo-search
+python-dotenv
