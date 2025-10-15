@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Bassam-Core Online</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0b0f19"/>
+  <style>
+    body{background:#0b0f19;color:#fff;font-family:Tahoma,Arial,sans-serif;text-align:center;margin-top:10%}
+    a.btn{display:inline-block;margin-top:22px;padding:10px 18px;background:#4e46dc;color:#fff;text-decoration:none;border-radius:10px}
+    a.btn:hover{background:#6b63ff}
+  </style>
+</head>
+<body>
+  <h1>✅ Bassam-Core Online (PWA)</h1>
+  <p>واجهة برمجية: <code>/api/chat</code></p>
+  <p><a class="btn" href="/docs">فتح وثائق الـAPI</a></p>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/static/service-worker.js").catch(console.error);
+    }
+  </script>
+</body>
+</html>
