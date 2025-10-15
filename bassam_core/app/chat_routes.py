@@ -2,15 +2,13 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from .assistant import answer, analyze_tone
-from workers.core_worker import enqueue_query  # ليتعلم من الرسائل
+from workers.core_worker import enqueue_dialog  # <-- الجديد
 
 router = APIRouter()
-
 
 class ChatIn(BaseModel):
     message: str
     tone: str | None = None
-
 
 @router.get("/chat", response_class=HTMLResponse)
 def chat_page():
@@ -115,17 +113,15 @@ micBtn.onclick=()=>{
 """
     return HTMLResponse(html)
 
-
 @router.post("/api/chat")
 async def api_chat(payload: ChatIn):
-    """واجهة دردشة ذكية + تعليم تلقائي"""
-    user_msg = payload.message.strip()
-    tone = payload.tone or analyze_tone(user_msg)
+    """واجهة دردشة ذكية + تعليم تلقائي بالحوار"""
+    user_msg = (payload.message or "").strip()
+    tn = payload.tone or analyze_tone(user_msg)
 
-    # الذكاء يرد
-    reply = answer(user_msg, tone)
+    reply = answer(user_msg, tn)
 
-    # تخزين الاستعلام ليتعلم منه النظام
-    enqueue_query(user_msg)
+    # الجديد: علّم النواة من الحوار (يدوّن الاستفسار + الرد)
+    enqueue_dialog(user_msg, reply, tn)
 
     return JSONResponse({"reply": reply, "learned": True})
