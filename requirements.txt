@@ -12,3 +12,4 @@ feedparser
 lxml
 duckduckgo-search
 python-dotenv
+cryptography
