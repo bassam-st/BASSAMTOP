@@ -1,57 +1,16 @@
-# bassam_core/app/main.py
-
 from fastapi import FastAPI
+from . import api
+from workers.core_worker import CORE_WORKER, SCHEDULER
 
-# ملاحظة: نستخدم واردات نسبية لأننا نشغّل Uvicorn مع --app-dir bassam_core
-from .api import router as api_router                 # /api/* endpoints
-from .routes import root as root_routes               # صفحات/مسارات عامة (إن وُجدت)
-from .chat_routes import router as chat_router        # مسارات الدردشة (إن وُجدت)
+app = FastAPI(title="BassamCore - Nucleus")
 
-# وظائف الخلفية/الجدولة
-from ..workers.scheduler import AutoIndexer           # جدولة فهرسة تلقائية
-from ..workers.news_worker import SCHEDULER           # جدولة أخبار (إن وُجدت)
-
-app = FastAPI(title="Bassam Core (Light)")
-
-# ربط الراوترات
-app.include_router(api_router, prefix="/api")
-app.include_router(root_routes.router)
-app.include_router(chat_router)
-
-# مبدّل الفهرسة التلقائي كل 15 دقيقة ويبدأ فوراً عند التشغيل
-auto_indexer = AutoIndexer(interval_minutes=15, run_immediately=True)
+app.include_router(api.router, prefix="/api")
 
 @app.on_event("startup")
-async def on_startup():
-    # تشغيل أي جداول وظائف عند الإقلاع
-    try:
-        auto_indexer.start()
-    except Exception as e:
-        print("Failed to start AutoIndexer:", e)
-
-    try:
-        # إن كان الـ SCHEDULER يحتاج start() ففعّله
-        if hasattr(SCHEDULER, "start"):
-            SCHEDULER.start()
-    except Exception as e:
-        print("Failed to start news SCHEDULER:", e)
+async def startup_event():
+    # شغّل الـscheduler (سيشغل الجولة الأولى فوراً لو run_immediately=True)
+    SCHEDULER.start()
 
 @app.on_event("shutdown")
-async def on_shutdown():
-    # إيقاف الجداول عند الإغلاق
-    try:
-        auto_indexer.shutdown()
-    except Exception as e:
-        print("Failed to shutdown AutoIndexer:", e)
-
-    try:
-        if hasattr(SCHEDULER, "shutdown"):
-            SCHEDULER.shutdown()
-    except Exception as e:
-        print("Failed to shutdown news SCHEDULER:", e)
-
-
-# نقطة فحص بسيطة للصحة
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def shutdown_event():
+    SCHEDULER.shutdown()
