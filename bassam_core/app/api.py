@@ -1,45 +1,23 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel
-from workers.news_worker import enqueue_query, query_index
-from app.db import get_recent_docs
-from utils.crypto import encrypt_json, decrypt_json
+from fastapi import APIRouter, HTTPException
+from typing import List
+from workers.core_worker import enqueue_task, query_index, get_status, get_latest_results
 
 router = APIRouter()
 
-class SearchRequest(BaseModel):
-    q: str
+@router.post("/learn")
+async def post_learn(q: str):
+    """أضف استعلام لتتعلمه النواة"""
+    enqueue_task(q)
+    return {"status":"accepted","q": q}
 
-@router.post("/search")
-async def search(req: SearchRequest, background: BackgroundTasks):
-    background.add_task(enqueue_query, req.q)
-    return {"status":"accepted","message":"query enqueued","query":req.q}
+@router.get("/queries", response_model=List[str])
+async def list_queries():
+    return query_index()
 
 @router.get("/status")
-def status():
-    return {"status":"ok"}
+async def status():
+    return get_status()
 
-@router.get("/docs/recent")
-def recent_docs():
-    docs = get_recent_docs(limit=10)
-    return {"count": len(docs), "docs": docs}
-
-@router.post("/encrypt")
-def api_encrypt(payload: dict):
-    token = encrypt_json(payload)
-    return {"token": token}
-
-@router.post("/decrypt")
-def api_decrypt(body: dict):
-    token = body.get("token")
-    if not token:
-        raise HTTPException(status_code=400, detail="token required")
-    data = decrypt_json(token)
-    return {"data": data}
-
-@router.post("/query_index")
-def api_query_index(body: dict):
-    q = body.get("q")
-    if not q:
-        raise HTTPException(status_code=400, detail="q required")
-    results = query_index(q, k=5)
-    return {"query": q, "results": results}
+@router.get("/results")
+async def results():
+    return get_latest_results()
