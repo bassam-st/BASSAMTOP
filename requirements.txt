@@ -1,3 +1,4 @@
+# --- Bassam AI Core Dependencies ---
 fastapi
 uvicorn
 httpx
@@ -10,6 +11,15 @@ pillow==11.3.0
 jinja2
 feedparser
 lxml
+
+# --- Extra Features (Search, Env, Security) ---
 duckduckgo-search
 python-dotenv
 cryptography
+
+# --- Optional Utilities (recommended for safety & performance) ---
+typing-extensions
+certifi
+charset-normalizer
+idna
+urllib3
