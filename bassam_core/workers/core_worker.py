@@ -201,3 +201,44 @@ def start_scheduler() -> None:
     _SCHED = Scheduler()
     _SCHED.start()
     print("🔥 Worker linked to Scheduler and running.")
+# داخل bassam_core/workers/core_worker.py
+from typing import List, Dict, Optional
+from .search_providers import search_google, search_ddg
+import os, time
+from ..app.db import save_docs  # تأكد أن db.py يوفّر save_docs
+
+def do_search(q: str, source: str = "auto", max_results: int = 8) -> List[Dict]:
+    """يبحث أولاً في Google (إن توفّرت المفاتيح) ثم يسقط على DDG."""
+    source = (source or "auto").lower()
+    results: List[Dict] = []
+    if source in ("google", "auto"):
+        try:
+            results = search_google(q, max_results=max_results)
+        except Exception:
+            results = []
+    if not results and source in ("ddg", "auto", "both"):
+        results = search_ddg(q, max_results=max_results)
+    if source == "both":  # دمج الإثنين
+        try:
+            g = search_google(q, max_results=max_results//2 or 4)
+        except Exception:
+            g = []
+        d = search_ddg(q, max_results=max_results - len(g))
+        results = (g or []) + (d or [])
+    return results
+
+def learn_from_query(q: str, source: str = "auto") -> Dict:
+    """ينفّذ بحثًا ويحفظ النتائج في قاعدة المعرفة."""
+    docs = do_search(q, source=source, max_results=10)
+    if docs:
+        save_docs(docs)
+    return {"learned": len(docs), "docs": docs[:5]}  # نرجّع عيّنة صغيرة للعرض
+
+# موجود مسبقًا لكن نضيف optional topics:
+def run_cycle_once(topics: Optional[List[str]] = None) -> Dict:
+    topics = topics or os.getenv("TOPICS", "الذكاء الاصطناعي, الأمن السيبراني").split(",")
+    total = 0
+    for t in [x.strip() for x in topics if x.strip()]:
+        total += learn_from_query(t).get("learned", 0)
+        time.sleep(1)
+    return {"message": "cycle_done", "topics": len(topics), "learned": total}
