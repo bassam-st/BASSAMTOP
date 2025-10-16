@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
-from workers.core_worker import enqueue_query, query_index
+from workers.core_worker import enqueue_task, query_index, get_status, get_latest_results
 from ..utils.crypto import encrypt_json, decrypt_json
 from ..app.db import get_recent_docs
 
