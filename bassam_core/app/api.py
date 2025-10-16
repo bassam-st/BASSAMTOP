@@ -1,3 +1,4 @@
+# bassam_core/app/api.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Literal
@@ -14,7 +15,7 @@ except Exception:
     def encrypt_json(x): return x
     def decrypt_json(x): return x
 
-# DB (للاحتياط)
+# DB (لاحتياط التوافق)
 try:
     from .db import get_recent_docs
 except Exception:
@@ -23,31 +24,29 @@ except Exception:
 router = APIRouter()
 
 # ===== نماذج الإدخال =====
-class SearchRequest(BaseModel):
+class SearchRequestImmediate(BaseModel):
     q: str
-    source: Optional[Literal["auto", "google", "ddg", "both"]] = "auto"
-    learn: Optional[bool] = False  # لو True يَحفظ النتائج في قاعدة المعرفة
+    source: Optional[Literal["auto","google","ddg","both"]] = "auto"
+    learn: Optional[bool] = False
+
+class SearchRequestQueued(BaseModel):
+    q: str  # للواجهة القديمة التي تضيف للصف فقط
 
 class LearnRunIn(BaseModel):
-    topics: Optional[List[str]] = None   # إن تركتها فارغة يستخدم TOPICS من البيئة
+    topics: Optional[List[str]] = None
 
-# ===== البحث الفوري (مع خيار التعلّم) =====
-@router.post("/search")
-async def search(req: SearchRequest):
+# ===== البحث الفوري (نتيجة مباشرة + تعلّم اختياري) =====
+@router.post("/search_immediate")
+async def search_immediate(req: SearchRequestImmediate):
     q = (req.q or "").strip()
     if not q:
         raise HTTPException(400, "q is empty")
-
-    # بحث فوري (Google أولاً إذا مفاتيحه موجودة، ثم DDG تلقائياً)
     results = do_search(q, source=req.source or "auto", max_results=8)
-
-    learned = 0
-    learned_sample = []
+    learned = 0; learned_sample = []
     if req.learn:
         lr = learn_from_query(q, source=req.source)
         learned = lr.get("learned", 0)
         learned_sample = lr.get("docs", [])
-
     return {
         "status": "ok",
         "query": q,
@@ -57,7 +56,16 @@ async def search(req: SearchRequest):
         "learned_sample": learned_sample
     }
 
-# ===== صفّ المهام (لمن يريد الإرسال المؤجّل) =====
+# ===== الإرسال إلى الصف (توافقًا مع واجهتك القديمة) =====
+@router.post("/search")
+async def search(req: SearchRequestQueued):
+    q = (req.q or "").strip()
+    if not q:
+        raise HTTPException(400, "q is empty")
+    enqueue_task(q)
+    return {"status": "accepted", "message": "queued", "query": q}
+
+# ===== عرض الصف =====
 @router.get("/status")
 async def status():
     return {"queue": query_index()}
@@ -67,14 +75,14 @@ async def status():
 async def news():
     return {"docs": get_recent_docs()}
 
-# ===== تجربة تشفير/فك تشفير (اختياري) =====
+# ===== تشفير (اختياري) =====
 @router.post("/secure")
 async def secure_echo(body: dict):
     token = encrypt_json(body)
     data = decrypt_json(token)
     return {"encrypted": token, "decrypted": data}
 
-# ===== تشغيل دورة تعلّم يدوياً =====
+# ===== تشغيل دورة يدويًا =====
 @router.post("/learn/run")
 async def learn_run(payload: LearnRunIn | None = None):
     topics = payload.topics if payload else None
