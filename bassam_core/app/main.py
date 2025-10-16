@@ -108,22 +108,19 @@ async function go(mode){
   if(!q) return alert('اكتب موضوعًا أولاً');
 
   try{
-    if(mode==='fast'){ // تعلّم فوري لسؤال واحد
+    if(mode==='fast'){
       show('⏳ يبحث الآن ويتعلّم…');
       await api('/api/learn/fast?q='+encodeURIComponent(q)+'&source='+encodeURIComponent(src), {method:'POST'});
-    }else{            // صف + تعلّم
+    }else{
       show('⏳ إضافة للصف ثم تشغيل دورة…');
       await api('/api/search',{method:'POST',body:JSON.stringify({q})});
       await api('/api/learn/run',{method:'POST',body:JSON.stringify({topics:[q]})});
     }
     hide(); show('✅ تم — يتم تحديث النتائج أسفل تلقائيًا.');
     startPolling();
-  }catch(e){
-    show('❌ خطأ: '+e.message);
-  }
+  }catch(e){ show('❌ خطأ: '+e.message); }
 }
 
-// Enter = بحث فوري
 document.getElementById('q').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); go('fast'); }});
 refreshState(); startPolling();
 </script>
