@@ -2,7 +2,7 @@
 import os, threading, time
 from typing import List, Dict, Optional
 from .search_providers import search_google, search_ddg
-from ..app.db import save_docs, get_recent_docs
+from bassam_core.app.db import save_docs, get_recent_docs
 
 # ====== صف انتظار ======
 _queue: List[str] = []
