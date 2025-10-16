@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from .search_providers import search_google, search_ddg
 from ..app.db import save_docs, get_recent_docs
 
-# ====== صف انتظار بسيط ======
+# ====== صف انتظار ======
 _queue: List[str] = []
 _lock = threading.Lock()
 
@@ -18,14 +18,11 @@ _state = {
 
 def enqueue_task(q: str):
     q = (q or "").strip()
-    if not q:
-        return
-    with _lock:
-        _queue.append(q)
+    if not q: return
+    with _lock: _queue.append(q)
 
 def query_index() -> List[str]:
-    with _lock:
-        return list(_queue)
+    with _lock: return list(_queue)
 
 def get_status() -> Dict:
     return dict(_state)
@@ -33,20 +30,17 @@ def get_status() -> Dict:
 def get_latest_results(limit: int = 10):
     return get_recent_docs(limit)
 
-# ====== البحث الفعلي (جوجل -> DDG) ======
+# ====== البحث (Google -> DDG) ======
 def do_search(q: str, source: str = "auto", max_results: int = 8) -> List[Dict]:
     source = (source or "auto").lower()
     results: List[Dict] = []
-    # Google أولاً (لو متوفر GOOGLE_API_KEY + GOOGLE_CSE_ID)
     if source in ("google", "auto"):
         try:
             results = search_google(q, max_results=max_results)
         except Exception:
             results = []
-    # السقوط إلى DDG
     if not results and source in ("ddg", "auto", "both"):
         results = search_ddg(q, max_results=max_results)
-    # دمج الإثنين
     if source == "both":
         try:
             g = search_google(q, max_results=max_results//2 or 4)
@@ -58,18 +52,15 @@ def do_search(q: str, source: str = "auto", max_results: int = 8) -> List[Dict]:
 
 def learn_from_query(q: str, source: str = "auto") -> Dict:
     docs = do_search(q, source=source, max_results=10)
-    if docs:
-        save_docs(docs)  # حفظ في SQLite
+    if docs: save_docs(docs)
     return {"learned": len(docs), "docs": docs[:5]}
 
 def run_cycle_once(topics: Optional[List[str]] = None) -> Dict:
-    """تشغيل دورة تعلّم: تنفّذ كل مواضيع TOPICS أو المرسلة، ثم تسحب صفّ الانتظار."""
-    # 1) نفّذ أي عناصر في الصف أولاً
+    """ينفّذ صفّ الانتظار ثم مواضيع TOPICS أو المُمرّرة."""
     drained = 0
     while True:
         with _lock:
-            if not _queue:
-                break
+            if not _queue: break
             q = _queue.pop(0)
         try:
             learn_from_query(q)
@@ -77,7 +68,6 @@ def run_cycle_once(topics: Optional[List[str]] = None) -> Dict:
         except Exception:
             pass
 
-    # 2) نفّذ مواضيع مجدولة (من env أو الوسيط)
     env_topics = os.getenv("TOPICS", "الذكاء الاصطناعي, الأمن السيبراني")
     tlist = topics if (topics and len(topics) > 0) else [x.strip() for x in env_topics.split(",") if x.strip()]
     learned_total = 0
@@ -92,23 +82,20 @@ def run_cycle_once(topics: Optional[List[str]] = None) -> Dict:
     _state["cycles_done"] += 1
     return {"message": "cycle_done", "queue_processed": drained, "topics": len(tlist), "learned": learned_total}
 
-# ====== حلقة الخلفية للمجدول ======
+# ====== المجدول ======
 def _loop():
     while _state["active"]:
         try:
             run_cycle_once()
         except Exception:
             pass
-        # نوم للفاصل
         interval = max(1, int(_state["interval_min"]))
         for _ in range(interval * 60):
-            if not _state["active"]:
-                return
+            if not _state["active"]: return
             time.sleep(1)
 
 def start_scheduler():
-    if _state["active"]:
-        return
+    if _state["active"]: return
     _state["active"] = True
     threading.Thread(target=_loop, daemon=True).start()
 
