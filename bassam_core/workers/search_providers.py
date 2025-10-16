@@ -7,7 +7,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 GOOGLE_CSE_ID  = os.getenv("GOOGLE_CSE_ID", "").strip()
 
 def search_ddg(q: str, max_results: int = 8) -> List[Dict]:
-    out = []
+    out: List[Dict] = []
     with DDGS() as ddg:
         for r in ddg.text(q, max_results=max_results):
             out.append({
@@ -19,7 +19,7 @@ def search_ddg(q: str, max_results: int = 8) -> List[Dict]:
     return out
 
 def search_google(q: str, max_results: int = 8) -> List[Dict]:
-    # يتطلب GOOGLE_API_KEY و GOOGLE_CSE_ID
+    # يتطلب GOOGLE_API_KEY و GOOGLE_CSE_ID (Programmable Search)
     import json, urllib.parse, urllib.request
     if not (GOOGLE_API_KEY and GOOGLE_CSE_ID):
         return []
@@ -30,11 +30,11 @@ def search_google(q: str, max_results: int = 8) -> List[Dict]:
         "num": max_results
     })
     url = f"https://www.googleapis.com/customsearch/v1?{params}"
-    req = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=20) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     items = data.get("items", []) or []
-    out = []
+    out: List[Dict] = []
     for it in items:
         out.append({
             "title": it.get("title"),
