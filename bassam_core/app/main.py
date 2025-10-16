@@ -1,61 +1,68 @@
+# bassam_core/app/main.py
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from .api import router as api_router
-from .chat_routes import router as chat_router  # إذا لم تكن تريد واجهة الدردشة احذف هذا السطر وهذا include
+from workers.core_worker import start_scheduler
 
 app = FastAPI(title="Bassam Core", version="1.0.0")
 
-# الصفحة الرئيسية HTML بسيطة
+# ضمّ مسارات الـ API
+app.include_router(api_router, prefix="/api", tags=["API"])
+
+# صفحة رئيسية بسيطة
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return """
-<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"/>
-<title>Bassam Core</title>
+    html = """
+<!doctype html><meta charset="utf-8"><title>Bassam Core</title>
 <style>
-body{background:#0b0f19;color:#fff;font-family:Tahoma,Arial,sans-serif;margin:0;padding:24px}
-.card{max-width:900px;margin:auto;background:#12182a;border:1px solid #24314d;border-radius:14px;padding:20px}
-.row{display:flex;gap:8px;margin-top:12px}
-input{flex:1;border:1px solid #2b3e63;border-radius:10px;background:#0b1324;color:#fff;padding:10px}
-button{border:1px solid #2b3e63;border-radius:10px;background:#17223a;color:#fff;padding:10px 14px;cursor:pointer}
-.hint{opacity:.8}
-a{color:#9ecbff}
+body{background:#0b1220;color:#fff;font-family:Tahoma,Arial;margin:0}
+.wrap{max-width:900px;margin:40px auto;padding:16px}
+.card{background:#0f1a2b;border:1px solid #1e2b44;border-radius:14px;padding:20px}
+.row{display:flex;gap:8px} input{flex:1;padding:10px;border-radius:10px;border:1px solid #2b3e63;background:#0b1324;color:#fff}
+button{padding:10px 16px;border-radius:10px;border:1px solid #2b3e63;background:#14223a;color:#fff;cursor:pointer}
+a{color:#9ad} small{opacity:.8}
 </style>
-<div class="card">
-  <h1>🧠 Bassam Core</h1>
-  <p class="hint">الخدمة تعمل الآن. جرّب البحث السريع أو افتح التوثيق.</p>
-
-  <div class="row">
-    <input id="q" placeholder="اكتب موضوعًا للتعلّم/البحث..." />
-    <button onclick="go()">بحث</button>
+<div class="wrap">
+  <div class="card">
+    <h2>Bassam Core 🧠</h2>
+    <p>الخدمة تعمل الآن ✅</p>
+    <p>جرّب البحث السريع أو افتح التوثيق أدناه.</p>
+    <div class="row">
+      <input id="q" placeholder="اكتب موضوعًا للبحث أو التعلّم..." />
+      <button onclick="go()">🔍 بحث</button>
+    </div>
+    <p><small>توثيق API: <a href="/docs" target="_blank">Swagger</a></small></p>
+    <p><small>عرض الأخبار: <a href="/api/news" target="_blank">/api/news</a></small></p>
+    <p><small>تشغيل دورة تعلّم يدويًا: <a href="#" onclick="run()">/api/learn/run</a></small></p>
+    <p><small>عرض حالة المجدول: <a href="/api/learn/state" target="_blank">/api/learn/state</a></small></p>
   </div>
-
-  <p style="margin-top:16px">
-    🔗 <a href="/docs">Swagger</a> —
-    📰 <a href="/api/news" target="_blank">/api/news</a> —
-    🔐 جرّب POST إلى <code>/api/secure</code>
-  </p>
 </div>
 <script>
 async function go(){
-  const q = document.getElementById('q').value.trim();
-  if(!q){ alert('اكتب استعلامًا'); return; }
-  const r = await fetch('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q})});
-  const j = await r.json();
-  alert('تمت إضافة المهمة: ' + JSON.stringify(j));
+  const q=document.getElementById('q').value.trim();
+  if(!q) return alert('❗ اكتب شيئًا أولاً');
+  await fetch('/api/search',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({q})
+  });
+  alert('✅ تمت إضافة المهمة إلى صف التعلّم.');
+}
+async function run(){
+  const r=await fetch('/api/learn/run',{method:'POST'}); 
+  const j=await r.json(); 
+  alert('🔁 ' + (j.message || 'تم تشغيل دورة التعلّم.'));
 }
 </script>
 """
+    return HTMLResponse(html)
 
-# favicon لتفادي 404
-@app.get("/favicon.ico")
-def favicon():
-    return Response(content=b"", media_type="image/x-icon")
-
-# نقطة صحّة سريعة
 @app.get("/health")
 def health():
+    """نقطة فحص بسيطة."""
     return JSONResponse({"ok": True})
 
-# راوترات الـ API
-app.include_router(api_router, prefix="/api", tags=["API"])
-app.include_router(chat_router, tags=["Chat"])
+# بدء المجدول تلقائيًا عند تشغيل الخادم
+@app.on_event("startup")
+def _startup():
+    start_scheduler()
