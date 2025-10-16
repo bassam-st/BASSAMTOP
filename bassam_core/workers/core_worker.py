@@ -1,58 +1,43 @@
 # bassam_core/workers/core_worker.py
 # -*- coding: utf-8 -*-
 """
-🔥 Bassam Core Worker – FINAL
-- صفّ مهام لطلبات المستخدم (enqueue → drain).
-- تعلّم ذاتي مجدول (Scheduler) + تشغيل دورة يدويًا عبر API.
-- تخزين النتائج بصيغة JSONL داخل bassam_core/data.
-- بحث افتراضي عبر DuckDuckGo (يمكن لاحقًا إضافة Google).
+🔥 Bassam Core Worker – Final Unified Version
+- يقوم بالبحث من Google أو DuckDuckGo.
+- ينفّذ التعلّم الذاتي المجدول.
+- يدعم البحث الفوري والتعلّم اليدوي عبر API.
 """
-
-from __future__ import annotations
 
 import os
 import json
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
+from duckduckgo_search import DDGS
 
-from duckduckgo_search import DDGS  # محرك البحث الافتراضي
-
-# =========================
-# مسارات العمل والتخزين
-# =========================
-PKG_DIR  = os.path.dirname(os.path.dirname(__file__))       # bassam_core/
-DATA_DIR = os.path.join(PKG_DIR, "data")
+# ==== إعداد المسارات ====
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-NEWS_PATH = os.path.join(DATA_DIR, "news.jsonl")        # أرشيف ما تعلّمه النظام
-QUEUE_PATH = os.path.join(DATA_DIR, "queue.jsonl")      # صفّ طلبات المستخدم
-KNOW_PATH  = os.path.join(DATA_DIR, "knowledge.jsonl")  # معرفة تراكمية (اختياري)
+NEWS_PATH = os.path.join(DATA_DIR, "news.jsonl")
+QUEUE_PATH = os.path.join(DATA_DIR, "queue.jsonl")
+KNOW_PATH = os.path.join(DATA_DIR, "knowledge.jsonl")
 
-# =========================
-# إعدادات الجدولة من البيئة
-# =========================
+# ==== إعداد الجدولة ====
 INTERVAL_MIN = int(os.getenv("LEARN_INTERVAL_MIN", "30"))
 INTERVAL_SEC = int(os.getenv("LEARN_INTERVAL_SEC", "0"))
 RUN_IMMEDIATELY = os.getenv("LEARN_RUN_IMMEDIATELY", "1") == "1"
 
-# =========================
-# مواضيع افتراضية للتعلّم الذاتي
-# =========================
-TOPICS: List[str] = [
-    "تقنيات الذكاء الاصطناعي الحديثة 2025",
-    "أطر Python لبناء واجهات برمجية: FastAPI و Flask",
-    "تحسين أداء تطبيقات الويب باستخدام AsyncIO",
-    "تصميم Chatbots تعتمد على RAG و LLMs",
-    "أفضل ممارسات التشفير والأمان في تطبيقات الويب",
-    "استخدام APIs مفتوحة لجلب الأخبار والمحتوى",
-    "تطبيقات الذكاء الاصطناعي في التعليم والعمل",
+# ==== مواضيع افتراضية ====
+TOPICS = [
+    "الذكاء الاصطناعي الحديث 2025",
+    "مشاريع Python و FastAPI",
+    "أمن المعلومات والتشفير",
+    "تعلّم الآلة Machine Learning",
 ]
 
-# =========================
-# أدوات JSONL بسيطة
-# =========================
+# ==== أدوات مساعدة JSONL ====
 def _append_jsonl(path: str, obj: Dict[str, Any]) -> None:
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -66,182 +51,168 @@ def _read_jsonl(path: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         lines = lines[-limit:]
     return [json.loads(x) for x in lines]
 
-# =========================
-# صفّ المهام والنتائج
-# =========================
+# ==== صفّ الطلبات ====
 _queue_lock = threading.Lock()
 _queue: List[Dict[str, Any]] = []
-
-_running = threading.Event()      # حالة العامل
-_NEXT_AT: Optional[str] = None    # وقت الدورة القادمة (UTC ISO)
+_running = threading.Event()
 
 def enqueue_task(q: str) -> None:
-    """إضافة مهمة (نصّ بحث/تعلّم) إلى الصفّ."""
-    q = (q or "").strip()
-    if not q:
+    item = {"q": q.strip(), "ts": datetime.utcnow().isoformat()}
+    if not item["q"]:
         return
-    item = {"q": q, "ts": datetime.utcnow().isoformat()}
     with _queue_lock:
         _queue.append(item)
     _append_jsonl(QUEUE_PATH, item)
 
 def query_index() -> List[str]:
-    """عرض آخر عبارات في الصف (للاطلاع فقط)."""
     with _queue_lock:
         return [x["q"] for x in _queue[-15:]]
 
 def get_status() -> Dict[str, Any]:
-    """حالة النظام والمجدول (تستدعيها الواجهة)."""
     return {
         "running": _running.is_set(),
         "interval_min": INTERVAL_MIN,
         "interval_sec": INTERVAL_SEC,
         "queue_size": len(_queue),
         "topics": TOPICS,
-        "next_run_at": _NEXT_AT,  # وقت الدورة التالية (UTC ISO)
     }
 
 def get_latest_results(limit: int = 10) -> List[Dict[str, Any]]:
-    """آخر ما تمّ تعلمه/أرشفته (للـ /api/news /api/learn/latest)."""
     docs = _read_jsonl(NEWS_PATH, limit=limit)
     return list(reversed(docs))
 
-# =========================
-# البحث + التلخيص البسيط
-# =========================
-def _ddg_search(q: str, n: int = 8) -> List[Dict[str, str]]:
-    """بحث عبر DuckDuckGo وإرجاع قائمة نتائج مبسّطة."""
-    results: List[Dict[str, str]] = []
+# ==== البحث من DuckDuckGo ====
+def search_ddg(q: str, max_results: int = 6) -> List[Dict[str, str]]:
+    results = []
     try:
         with DDGS() as d:
-            for r in d.text(q, max_results=n, region="sa-ar"):
+            for r in d.text(q, max_results=max_results, region="sa-ar"):
                 results.append({
-                    "title": r.get("title", "") or "",
-                    "url": r.get("href", "") or "",
-                    "snippet": (r.get("body") or "")[:300],
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "snippet": (r.get("body") or "")[:250],
                 })
     except Exception as e:
         results.append({"title": "SearchError", "url": "", "snippet": str(e)})
     return results
 
-def _summarize(q: str, results: List[Dict[str, str]]) -> str:
-    """تلخيص نصي مبسّط لأوّل النتائج (مكان مناسب لاحقًا لاستدعاء LLM)."""
-    lines = [f"- {r['title']}: {r['snippet']}" for r in results[:5] if r.get("title") or r.get("snippet")]
-    if not lines:
-        lines = ["- لا توجد نتائج كافية."]
-    return f"📘 ملخص حول «{q}»:\n" + "\n".join(lines)
+# ==== البحث من Google إن وُجدت المفاتيح ====
+def search_google(q: str, max_results: int = 6) -> List[Dict[str, str]]:
+    api_key = os.getenv("GOOGLE_API_KEY")
+    cx = os.getenv("GOOGLE_CX")
+    if not api_key or not cx:
+        return []
+    try:
+        import requests
+        url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={cx}&q={q}"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        out = []
+        for item in data.get("items", []):
+            out.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "snippet": item.get("snippet", ""),
+            })
+        return out
+    except Exception as e:
+        return [{"title": "GoogleSearchError", "url": "", "snippet": str(e)}]
 
-def _learn_once(q: str) -> Dict[str, Any]:
-    """ينفّذ بحثًا + تلخيصًا ويخزن النتيجة في الأرشيف."""
-    results = _ddg_search(q)
-    summary = _summarize(q, results)
-    doc = {
+# ==== منطق الدمج ====
+def do_search(q: str, source: str = "auto", max_results: int = 8) -> List[Dict[str, Any]]:
+    source = (source or "auto").lower()
+    results: List[Dict[str, Any]] = []
+    if source in ("google", "auto"):
+        try:
+            results = search_google(q, max_results=max_results)
+        except Exception:
+            results = []
+    if not results and source in ("ddg", "auto", "both"):
+        results = search_ddg(q, max_results=max_results)
+    if source == "both":
+        g = search_google(q, max_results=max_results // 2)
+        d = search_ddg(q, max_results=max_results // 2)
+        results = (g or []) + (d or [])
+    return results
+
+# ==== دالة التعلّم الفوري (المطلوبة من api.py) ====
+def learn_from_query(q: str, source: str = "auto") -> Dict[str, Any]:
+    docs = do_search(q, source=source, max_results=10)
+    summary = "📘 ملخص حول «{}»:\n".format(q)
+    summary += "\n".join([f"- {d['title']}: {d.get('snippet','')[:150]}" for d in docs[:5]])
+    record = {
         "query": q,
         "summary": summary,
         "timestamp": datetime.utcnow().isoformat(),
-        "results": results,
+        "results": docs,
     }
-    _append_jsonl(NEWS_PATH, doc)
-    _append_jsonl(KNOW_PATH, doc)
-    return doc
+    _append_jsonl(NEWS_PATH, record)
+    _append_jsonl(KNOW_PATH, record)
+    return {"learned": len(docs), "docs": docs[:5]}
 
+# ==== دورة التعلّم ====
 def _drain_queue() -> int:
-    """تنفيذ جميع المهام الموجودة في الصفّ (مرة واحدة)."""
+    count = 0
     global _queue
     with _queue_lock:
         if not _queue:
             return 0
         batch = _queue[:]
         _queue = []
-    count = 0
     for item in batch:
-        try:
-            _learn_once(item["q"])
-            count += 1
-        except Exception as e:
-            _append_jsonl(NEWS_PATH, {"error": str(e), "query": item["q"], "ts": datetime.utcnow().isoformat()})
+        learn_from_query(item["q"])
+        count += 1
     return count
 
-# =========================
-# المجدول Scheduler
-# =========================
+def run_cycle_once(custom_topics: Optional[List[str]] = None) -> Dict[str, Any]:
+    print(f"🔁 Auto-learning cycle @ {datetime.utcnow().isoformat()}")
+    done_from_queue = _drain_queue()
+    topics = custom_topics if custom_topics else TOPICS
+    done_from_topics = 0
+    for topic in topics:
+        learn_from_query(topic)
+        done_from_topics += 1
+    msg = f"✅ Cycle complete — queue:{done_from_queue}, topics:{done_from_topics}"
+    print(msg)
+    return {"queue": done_from_queue, "topics": done_from_topics, "message": msg}
+
+# ==== المجدول ====
 class Scheduler:
-    def __init__(self, minutes: int = INTERVAL_MIN, seconds: int = INTERVAL_SEC, run_now: bool = RUN_IMMEDIATELY):
-        self.interval = max(1, minutes * 60 + seconds)
+    def __init__(self, minutes=INTERVAL_MIN, seconds=INTERVAL_SEC, run_now=RUN_IMMEDIATELY):
+        self.interval = minutes * 60 + seconds
         self.run_now = run_now
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._loop, daemon=True)
 
     def start(self):
-        global _NEXT_AT
-        # حساب وقت الدورة القادمة فور البدء
-        _NEXT_AT = (datetime.utcnow() + timedelta(seconds=self.interval)).isoformat()
-        print(f"🕒 Scheduler started (every {self.interval//60} min {self.interval%60}s)")
+        print(f"🕒 Scheduler started (every {self.interval//60} min)")
         self.thread.start()
 
     def stop(self):
         self.stop_event.set()
         print("🛑 Scheduler stopped")
 
-    def _sleep_chunked(self):
-        # نوم مجزأ يسمح بالإيقاف السلس
-        remaining = self.interval
-        step = 0.1
-        loops = int(remaining / step)
-        for _ in range(loops):
+    def _sleep(self):
+        for _ in range(int(self.interval * 10)):
             if self.stop_event.is_set():
                 return
-            time.sleep(step)
+            time.sleep(0.1)
 
     def _loop(self):
         if self.run_now:
             self._tick()
         while not self.stop_event.is_set():
-            self._sleep_chunked()
+            self._sleep()
             if self.stop_event.is_set():
                 break
             self._tick()
 
     def _tick(self):
-        global _NEXT_AT
-        try:
-            run_cycle_once()  # تنفيذ دورة كاملة (صف + مواضيع)
-        finally:
-            _NEXT_AT = (datetime.utcnow() + timedelta(seconds=self.interval)).isoformat()
+        run_cycle_once()
 
-# =========================
-# تشغيل دورة يدويًا / بواسطة المجدول
-# =========================
-def run_cycle_once(custom_topics: Optional[List[str]] = None) -> Dict[str, Any]:
-    """
-    تشغيل دورة تعلّم كاملة الآن:
-      1) يفرّغ الصفّ (طلبات المستخدم).
-      2) يتعلّم من قائمة مواضيع (مخصّصة أو الافتراضية).
-    """
-    print(f"🔁 Auto-learning cycle @ {datetime.utcnow().isoformat()}")
-
-    done_from_queue = _drain_queue()
-    topics = [t for t in (custom_topics or TOPICS) if t and t.strip()]
-
-    done_from_topics = 0
-    for topic in topics:
-        try:
-            _learn_once(topic.strip())
-            done_from_topics += 1
-        except Exception as e:
-            _append_jsonl(NEWS_PATH, {"topic": topic, "error": str(e), "ts": datetime.utcnow().isoformat()})
-
-    msg = f"✅ Cycle complete — queue:{done_from_queue}, topics:{done_from_topics}"
-    print(msg)
-    return {"queue": done_from_queue, "topics": done_from_topics, "message": msg}
-
-# =========================
-# واجهة بدء العامل من تطبيق FastAPI
-# =========================
 _SCHED: Optional[Scheduler] = None
 
 def start_scheduler() -> None:
-    """تُستدعى من حدث startup في FastAPI لربط العامل بالمجدول."""
     global _SCHED
     if _SCHED:
         return
