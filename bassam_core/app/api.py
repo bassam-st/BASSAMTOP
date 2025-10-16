@@ -1,8 +1,14 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+
+# استيراد العامل (worker) الصحيح
 from workers.core_worker import enqueue_task, query_index, get_status, get_latest_results
+
+# تشفير/فك تشفير (لو كنت تستخدم utils/crypto.py)
 from ..utils.crypto import encrypt_json, decrypt_json
-from ..app.db import get_recent_docs
+
+# استيراد الدالة من db داخل نفس مجلد app
+from .db import get_recent_docs
 
 router = APIRouter()
 
@@ -13,7 +19,8 @@ class SearchRequest(BaseModel):
 async def search(req: SearchRequest, background: BackgroundTasks):
     if not req.q.strip():
         raise HTTPException(400, "q is empty")
-    background.add_task(enqueue_query, req.q.strip())
+    # ✅ استدعاء الدالة الصحيحة
+    background.add_task(enqueue_task, req.q.strip())
     return {"status": "accepted", "message": "queued", "query": req.q}
 
 @router.get("/status")
