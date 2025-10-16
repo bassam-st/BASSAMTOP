@@ -24,7 +24,7 @@ def index():
 select, input{background:#0b1324;border:1px solid var(--line);color:#fff;border-radius:10px;padding:10px}
 input{min-width:260px}
 .btn{border:1px solid var(--line);background:#14223a;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
-small,.muted{color:var(--muted)}
+small,.muted{color:#a5b4d4}
 .grid{margin-top:12px; display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
 .item{background:#0b1628;border:1px solid var(--line);border-radius:10px;padding:10px}
 .item h4{margin:0 0 6px 0; font-size:15px}
@@ -44,13 +44,15 @@ a{color:#9ad}
     <div class="controls">
       <select id="src">
         <option value="auto">Auto (Google → DDG)</option>
+        <option value="google">Google فقط</option>
         <option value="ddg">DuckDuckGo فقط</option>
+        <option value="both">Google + DDG</option>
       </select>
       <input id="q" placeholder="اكتب موضوعًا… مثال: مباريات اليوم" />
       <button class="btn" onclick="go('fast')">بحث فوري + تعلّم</button>
-      <button class="btn" onclick="go('queued')">بحث (صفّ + تعلّم)</button>
+      <button class="btn" onclick="go('queued')">بحث (صف + تعلّم)</button>
     </div>
-    <small class="muted">الأول: يضيف للصفّ ثم يشغّل دورة ويتابع النتائج. الثاني: يبحث الآن ويعرض نتيجة فورية ويتعلّم فورًا.</small>
+    <small class="muted">الأول: يبحث الآن ويخزّن ويعرض. الثاني: يضيف للصف ثم يشغّل دورة ويعرض.</small>
 
     <div id="notice" class="notice"></div>
     <div id="results" class="grid"></div>
@@ -60,10 +62,10 @@ a{color:#9ad}
 <script>
 let pollTimer=null;
 
-function setBadge(running, nextTs){
+function setBadge(running){
   const el=document.getElementById('stateBadge');
   if(running){ el.className='badge ok'; el.textContent='الحالة: يعمل الآن'; }
-  else{ el.className='badge idle'; el.textContent='الحالة: غير نشط' + (nextTs? ' — التالية: '+new Date(nextTs).toLocaleTimeString(): ''); }
+  else{ el.className='badge idle'; el.textContent='الحالة: غير نشط'; }
 }
 function show(msg){ const n=document.getElementById('notice'); n.style.display='block'; n.textContent=typeof msg==='string'?msg:JSON.stringify(msg,null,2); }
 function hide(){ const n=document.getElementById('notice'); n.style.display='none'; }
@@ -76,7 +78,7 @@ async function api(path, opt={}){
 }
 
 async function refreshState(){
-  try{ const st=await api('/api/learn/state'); setBadge(st.running, st.next_run_at); }catch(e){}
+  try{ const st=await api('/api/learn/state'); setBadge(!!st.running); }catch(e){}
 }
 
 function render(items){
@@ -106,9 +108,9 @@ async function go(mode){
   if(!q) return alert('اكتب موضوعًا أولاً');
 
   try{
-    if(mode==='fast'){ // بحث وتعلّم فوري
+    if(mode==='fast'){ // تعلّم فوري لسؤال واحد
       show('⏳ يبحث الآن ويتعلّم…');
-      await api('/api/learn/run',{method:'POST',body:JSON.stringify({topics:[q]})});
+      await api('/api/learn/fast?q='+encodeURIComponent(q)+'&source='+encodeURIComponent(src), {method:'POST'});
     }else{            // صف + تعلّم
       show('⏳ إضافة للصف ثم تشغيل دورة…');
       await api('/api/search',{method:'POST',body:JSON.stringify({q})});
@@ -134,5 +136,4 @@ def health():
 
 @app.on_event("startup")
 def _startup():
-    # مهم: يربط المجدول بالعامل
     start_scheduler()
