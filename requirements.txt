@@ -13,3 +13,4 @@ lxml
 duckduckgo-search==6.3.0
 python-dotenv
 cryptography
+websockets
