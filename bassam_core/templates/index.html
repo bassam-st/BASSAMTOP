@@ -1,0 +1,79 @@
+!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Bassam Core</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Bassam Core <span>🧠</span></h1>
+      <div class="badge {{ 'active' if state.get('active') else 'inactive' }}">
+        الحالة: {{ 'نشط' if state.get('active') else 'غير نشط' }}
+      </div>
+      <nav>
+        <a href="/docs" target="_blank">Swagger</a>
+        <a href="/api/state" target="_blank">/api/state</a>
+      </nav>
+    </header>
+
+    <section class="controls">
+      <form id="searchForm" onsubmit="return runOnce(event)">
+        <input id="q" name="q" placeholder="اكتب موضوع البحث..." />
+        <button type="submit">بحث فوري + تعلّم</button>
+      </form>
+
+      <form id="queueForm" onsubmit="return enqueue(event)">
+        <input id="qq" name="q" placeholder="أضف للصف (يُنفذ كل 30 دقيقة)" />
+        <button type="submit">إضافة للصف</button>
+      </form>
+
+      <p class="hint">الوضع: الويب فقط يعرض/يُشغِّل دورة واحدة يدويًا. التعلّم الدوري يعمل في خدمة Worker.</p>
+    </section>
+
+    <section>
+      <h2>آخر الملخصات</h2>
+      {% if recents %}
+        {% for s in recents %}
+          <article class="card">
+            <h3>📝 {{ s.get('query','(بدون استعلام)') }}</h3>
+            <pre>{{ s.get('summary','') }}</pre>
+            <details>
+              <summary>المصادر</summary>
+              <ul>
+                {% for it in s.get('items',[]) %}
+                  <li><a href="{{ it.get('url') }}" target="_blank">{{ it.get('title') }}</a></li>
+                {% endfor %}
+              </ul>
+            </details>
+          </article>
+        {% endfor %}
+      {% else %}
+        <p>لا توجد ملخصات بعد.</p>
+      {% endif %}
+    </section>
+  </div>
+
+<script>
+async function runOnce(e){
+  e.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  const r = await fetch('/api/learn/once?q='+encodeURIComponent(q), {method:'POST'});
+  const j = await r.json();
+  alert('تم التشغيل: ' + (j.ok ? 'نجاح' : 'فشل'));
+  location.reload();
+  return false;
+}
+async function enqueue(e){
+  e.preventDefault();
+  const q = document.getElementById('qq').value.trim();
+  const r = await fetch('/api/queue?q='+encodeURIComponent(q), {method:'POST'});
+  const j = await r.json();
+  alert('أُضيف للصف: ' + q);
+  return false;
+}
+</script>
+</body>
+</html>
