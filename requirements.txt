@@ -1,13 +1,24 @@
-fastapi==0.115.2
-uvicorn==0.32.0
-gunicorn==22.0.0
-jinja2==3.1.4
-python-multipart==0.0.12
+# ====== Bassam-Core Requirements ======
+fastapi
+uvicorn
+httpx
+requests
+beautifulsoup4
+duckduckgo-search
+apscheduler
+pyyaml
+tqdm
+aiofiles
+jinja2
+pydantic
+numpy
+pandas
 
-requests==2.32.3
-beautifulsoup4==4.12.3
+# إذا كان النظام يستخدم تلخيص أو تعلم ذاتي:
+openai
+googlesearch-python
+langchain
+faiss-cpu
 
-apscheduler==3.10.4
-pytz==2024.1
-
-openai==1.47.0  # اختياري: لو عندك OPENAI_API_KEY
+# ====== Development / Utility ======
+python-dotenv
