@@ -1,25 +1,240 @@
-<!DOCTYPE html>
-<html lang="ar">
+<!doctype html>
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Bassam-Core Online</title>
+  <meta charset="utf-8" />
+  <title>Bassam Core</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- ملف التنسيق الموجود عندك -->
+  <link rel="stylesheet" href="/static/style.css">
+
+  <!-- PWA (اختياري لو تستخدمه) -->
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#0b0f19"/>
-  <style>
-    body{background:#0b0f19;color:#fff;font-family:Tahoma,Arial,sans-serif;text-align:center;margin-top:10%}
-    a.btn{display:inline-block;margin-top:22px;padding:10px 18px;background:#4e46dc;color:#fff;text-decoration:none;border-radius:10px}
-    a.btn:hover{background:#6b63ff}
-  </style>
 </head>
-<body>
-  <h1>✅ Bassam-Core Online (PWA)</h1>
-  <p>واجهة برمجية: <code>/api/chat</code></p>
-  <p><a class="btn" href="/docs">فتح وثائق الـAPI</a></p>
+<body style="background:#020617; margin:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+
+  <main style="min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem;">
+    <section style="width:100%; max-width:900px;">
+
+      <!-- الكرت الرئيسي -->
+      <div style="
+        background:#020617;
+        border-radius:1rem;
+        padding:1.25rem 1.5rem;
+        border:1px solid #1f2937;
+        color:#e5e7eb;
+        box-shadow:0 10px 25px rgba(0,0,0,0.4);
+      ">
+        <!-- الهيدر -->
+        <header style="
+          display:flex;
+          flex-wrap:wrap;
+          align-items:center;
+          justify-content:space-between;
+          gap:.75rem;
+          margin-bottom:1rem;
+        ">
+          <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+            <div style="
+              width:28px; height:28px;
+              border-radius:999px;
+              background:radial-gradient(circle at 30% 20%, #f97316, #ec4899 45%, #6366f1);
+              display:flex; align-items:center; justify-content:center;
+              box-shadow:0 5px 15px rgba(129,140,248,.6);
+            ">
+              <span style="font-size:1.1rem;">🧠</span>
+            </div>
+            <div>
+              <div style="font-weight:600; font-size:.98rem;">Bassam Core</div>
+              <div style="font-size:.75rem; color:#9ca3af;">
+                الحالة: <span id="engine-status" style="color:#f97316;">غير نشط فقط</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; font-size:.75rem;">
+            <a href="/docs" style="color:#60a5fa; text-decoration:none;">Swagger</a>
+            <span style="opacity:.4;">/</span>
+            <a href="/api/news" style="color:#60a5fa; text-decoration:none;">/api/news</a>
+          </div>
+        </header>
+
+        <!-- السطر الثاني: اختيار المحرك + حقل النص -->
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
+          <select id="engine-select" style="
+            background:#020617;
+            color:#e5e7eb;
+            border-radius:.5rem;
+            border:1px solid #374151;
+            padding:.4rem .6rem;
+            font-size:.8rem;
+          ">
+            <option value="auto">Auto (Google + DDG)</option>
+            <option value="google">Google فقط</option>
+            <option value="ddg">DuckDuckGo فقط</option>
+            <option value="none">بدون بحث خارجي</option>
+          </select>
+
+          <input id="query-input" type="text" placeholder="اكتب موضوعًا… مثال: مباريات اليوم"
+            style="
+              flex:1 1 180px;
+              min-width:0;
+              background:#020617;
+              color:#e5e7eb;
+              border-radius:.5rem;
+              border:1px solid #374151;
+              padding:.45rem .7rem;
+              font-size:.85rem;
+              outline:none;
+            "
+          />
+        </div>
+
+        <!-- وصف قصير -->
+        <p style="margin:0 0 .75rem; font-size:.75rem; color:#9ca3af;">
+          الأول: يبحث الآن ويفكر ويعرض، الثاني: يضيف للذاكرة، الثالث: تم تفعيل دورة وتحديث.
+        </p>
+
+        <!-- الأزرار -->
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+          <button id="btn-search-teach" type="button" style="
+            background:#111827;
+            color:#e5e7eb;
+            border-radius:.5rem;
+            border:1px solid #374151;
+            padding:.4rem .75rem;
+            font-size:.78rem;
+            cursor:pointer;
+          ">
+            بحث (صفه + تلخيص)
+          </button>
+
+          <button id="btn-search-quick-teach" type="button" style="
+            background:#111827;
+            color:#e5e7eb;
+            border-radius:.5rem;
+            border:1px solid #374151;
+            padding:.4rem .75rem;
+            font-size:.78rem;
+            cursor:pointer;
+          ">
+            بحث فوري + تلخيص
+          </button>
+
+          <button id="btn-search-only" type="button" style="
+            background:#111827;
+            color:#e5e7eb;
+            border-radius:.5rem;
+            border:1px solid #374151;
+            padding:.4rem .75rem;
+            font-size:.78rem;
+            cursor:pointer;
+          ">
+            بحث (صفه فقط)
+          </button>
+        </div>
+      </div>
+
+      <!-- مكان عرض النتائج -->
+      <section style="
+        margin-top:1.25rem;
+        background:#020617;
+        border-radius:1rem;
+        padding:1rem 1.25rem;
+        border:1px solid #1f2937;
+        color:#e5e7eb;
+        min-height:140px;
+        white-space:pre-wrap;
+        font-size:.9rem;
+      " id="result-box">
+        اكتب استفسارك واضغط أحد أزرار البحث…
+      </section>
+
+    </section>
+  </main>
+
+  <!-- سكربت بسيط لتشغيل الأزرار -->
   <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/static/service-worker.js").catch(console.error);
+    async function runSearch(mode) {
+      const input = document.getElementById('query-input');
+      const engineSelect = document.getElementById('engine-select');
+      const resultBox = document.getElementById('result-box');
+
+      const query = (input.value || '').trim();
+      const engine = engineSelect.value || 'auto';
+
+      if (!query) {
+        resultBox.textContent = 'اكتب سؤال أو موضوع أولاً ثم اضغط زر البحث.';
+        input.focus();
+        return;
+      }
+
+      resultBox.textContent = 'جاري البحث والتفكير…';
+
+      try {
+        const response = await fetch('/api/news', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            query: query,
+            engine: engine,
+            mode: mode   // مثلا: "search_teach" أو "quick_search" إلخ
+          })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!response.ok) {
+          const text = await response.text();
+          resultBox.textContent = 'خطأ من الخادم (' + response.status + '):\\n' + text;
+          return;
+        }
+
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          // حاول نقرأ حقول مختلفة حسب ما ترجع الـ API
+          const answer =
+            data.answer ||
+            data.result ||
+            data.summary ||
+            JSON.stringify(data, null, 2);
+
+          resultBox.textContent = answer;
+        } else {
+          const text = await response.text();
+          resultBox.textContent = text;
+        }
+      } catch (err) {
+        console.error(err);
+        resultBox.textContent = 'تعذر الاتصال بالخادم. تأكد أن السيرفر يعمل على Render.';
+      }
     }
+
+    // ربط الأزرار
+    document.getElementById('btn-search-teach')
+      .addEventListener('click', function () {
+        runSearch('search_and_learn');
+      });
+
+    document.getElementById('btn-search-quick-teach')
+      .addEventListener('click', function () {
+        runSearch('quick_search_and_learn');
+      });
+
+    document.getElementById('btn-search-only')
+      .addEventListener('click', function () {
+        runSearch('search_only');
+      });
+
+    // تشغيل البحث بزر Enter
+    document.getElementById('query-input')
+      .addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          runSearch('search_and_learn');
+        }
+      });
   </script>
 </body>
 </html>
