@@ -5,10 +5,8 @@
   <title>Bassam Core</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  {# ملف التنسيق الموجود في static/style.css #}
+  <!-- ملف التنسيق -->
   <link rel="stylesheet" href="{{ request.url_for('static', path='style.css') }}">
-
-  {# ملفات الـ PWA لو تستخدمها #}
   <link rel="manifest" href="{{ request.url_for('static', path='manifest.json') }}">
 </head>
 <body style="background:#020617; margin:0; font-family: system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -55,7 +53,7 @@
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; font-size:.75rem;">
             <a href="/docs" style="color:#60a5fa; text-decoration:none;">Swagger</a>
             <span style="opacity:.4;">/</span>
-            <a href="/api/news" style="color:#60a5fa; text-decoration:none;">/api/news</a>
+            <a href="/api/state" style="color:#60a5fa; text-decoration:none;">/api/state</a>
           </div>
         </header>
 
@@ -92,7 +90,7 @@
 
         <!-- وصف قصير -->
         <p style="margin:0 0 .75rem; font-size:.75rem; color:#9ca3af;">
-          الأول: يبحث الآن ويفكر ويعرض، الثاني: بحث فوري مع تلخيص، الثالث: بحث فقط بدون تعليم.
+          اكتب سؤالك ثم اختر نوع البحث: مع تعلّم، أو فوري، أو بحث فقط بدون تعلّم.
         </p>
 
         <!-- الأزرار -->
@@ -106,7 +104,7 @@
             font-size:.78rem;
             cursor:pointer;
           ">
-            بحث (صفه + تلخيص)
+            بحث (صف + تعلّم)
           </button>
 
           <button id="btn-search-quick-teach" type="button" style="
@@ -118,7 +116,7 @@
             font-size:.78rem;
             cursor:pointer;
           ">
-            بحث فوري + تلخيص
+            بحث فوري + تعلّم
           </button>
 
           <button id="btn-search-only" type="button" style="
@@ -130,7 +128,7 @@
             font-size:.78rem;
             cursor:pointer;
           ">
-            بحث (صفه فقط)
+            بحث (صف فقط)
           </button>
         </div>
       </div>
@@ -147,13 +145,14 @@
         white-space:pre-wrap;
         font-size:.9rem;
       " id="result-box">
-        اكتب استفسارك واضغط أحد أزرار البحث…
+        اكتب استفسارك واضغط أحد أزرار البحث…  
+        إذا كان هناك خطأ في الخادم أو في الاتصال سيظهر هنا أيضًا.
       </section>
 
     </section>
   </main>
 
-  <!-- سكربت لتشغيل الأزرار وربطها مع /api/news -->
+  <!-- سكربت الواجهة -->
   <script>
     async function runSearch(mode) {
       const input = document.getElementById('query-input');
@@ -169,7 +168,7 @@
         return;
       }
 
-      resultBox.textContent = 'جاري البحث والتفكير…';
+      resultBox.textContent = 'جاري البحث والتفكير… (يتم الاتصال بـ /api/news)';
 
       try {
         const response = await fetch('/api/news', {
@@ -178,7 +177,7 @@
           body: JSON.stringify({
             query: query,
             engine: engine,
-            mode: mode   // مثل: search_and_learn / quick_search_and_learn / search_only
+            mode: mode
           })
         });
 
@@ -192,10 +191,13 @@
 
         if (contentType.includes('application/json')) {
           const data = await response.json();
+
+          // نجرب عدة مفاتيح محتملة
           const answer =
             data.answer ||
             data.result ||
             data.summary ||
+            data.message ||
             JSON.stringify(data, null, 2);
 
           resultBox.textContent = answer;
@@ -205,7 +207,7 @@
         }
       } catch (err) {
         console.error(err);
-        resultBox.textContent = 'تعذر الاتصال بالخادم. تأكد أن السيرفر يعمل على Render.';
+        resultBox.textContent = 'تعذر الاتصال بالخادم. تأكد أن السيرفر شغال على Render ثم حدّث الصفحة.';
       }
     }
 
